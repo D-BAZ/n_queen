@@ -1,315 +1,424 @@
 import random
 import math
 import time
+from collections import defaultdict
 
-class NQueensSimulatedAnnealing:
-    def __init__(self, n, initial_temp=100.0, cooling_rate=0.95, min_temp=0.01, max_iterations=10000):
+class OptimizedNQueensSimulatedAnnealing:
+    def __init__(self, n, initial_temp=None, cooling_rate=0.99, min_temp=0.001, 
+                 max_iterations=None, adaptive_cooling=True):
         """
-        Initialize the Simulated Annealing solver for N-Queens problem.
+        Optimized Simulated Annealing solver for N-Queens problem.
         
         Args:
             n: Size of the chessboard (n x n)
-            initial_temp: Starting temperature for simulated annealing
-            cooling_rate: Rate at which temperature decreases (0 < rate < 1)
+            initial_temp: Starting temperature (auto-calculated if None)
+            cooling_rate: Rate at which temperature decreases
             min_temp: Minimum temperature threshold
-            max_iterations: Maximum number of iterations per temperature
+            max_iterations: Max iterations per temperature (auto-calculated if None)
+            adaptive_cooling: Use adaptive cooling schedule
         """
         self.n = n
-        self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
         self.min_temp = min_temp
-        self.max_iterations = max_iterations
+        self.adaptive_cooling = adaptive_cooling
         
-        # Statistics tracking
-        self.total_steps = 0
-        self.solve_time = 0
-        self.temperature_changes = 0
-        self.accepted_moves = 0
-        self.rejected_moves = 0
-        self.solutions_found = 0
+        # Auto-calculate parameters based on problem size
+        self.initial_temp = initial_temp or max(10.0, n * 2.0)
+        self.max_iterations = max_iterations or max(100, n * 10)
         
-        # Step-by-step tracking
-        self.steps = []
-        self.step_by_step_enabled = False
+        # Conflict tracking arrays for O(1) conflict updates
+        self.row_conflicts = [0] * n
+        self.diag1_conflicts = [0] * (2 * n - 1)  # / diagonal
+        self.diag2_conflicts = [0] * (2 * n - 1)  # \ diagonal
+        
+        # Statistics
+        self.stats = {
+            'total_steps': 0,
+            'solve_time': 0,
+            'temperature_changes': 0,
+            'accepted_moves': 0,
+            'rejected_moves': 0,
+            'solutions_found': 0,
+            'best_conflicts': float('inf'),
+            'plateau_count': 0
+        }
         
         # Current state
         self.board = None
         self.current_conflicts = 0
+        self.best_board = None
+        self.best_conflicts = float('inf')
         
-    def count_conflicts(self, board):
-        """Count the number of queen conflicts on the board."""
+        # Step tracking (memory efficient)
+        self.steps = []
+        self.track_steps = False
+        self.max_steps_tracked = 1000
+        
+    def _get_diag1_index(self, row, col):
+        """Get index for / diagonal (row - col + n - 1)"""
+        return row - col + self.n - 1
+    
+    def _get_diag2_index(self, row, col):
+        """Get index for \ diagonal (row + col)"""
+        return row + col
+    
+    def _update_conflicts_fast(self, col, old_row, new_row, delta):
+        """Fast conflict update using tracking arrays"""
+        # Update row conflicts
+        self.row_conflicts[old_row] += delta
+        self.row_conflicts[new_row] -= delta
+        
+        # Update diagonal conflicts
+        self.diag1_conflicts[self._get_diag1_index(old_row, col)] += delta
+        self.diag1_conflicts[self._get_diag1_index(new_row, col)] -= delta
+        
+        self.diag2_conflicts[self._get_diag2_index(old_row, col)] += delta
+        self.diag2_conflicts[self._get_diag2_index(new_row, col)] -= delta
+    
+    def _initialize_conflict_arrays(self, board):
+        """Initialize conflict tracking arrays"""
+        # Reset arrays
+        self.row_conflicts = [0] * self.n
+        self.diag1_conflicts = [0] * (2 * self.n - 1)
+        self.diag2_conflicts = [0] * (2 * self.n - 1)
+        
+        # Count conflicts
+        for col in range(self.n):
+            row = board[col]
+            self.row_conflicts[row] += 1
+            self.diag1_conflicts[self._get_diag1_index(row, col)] += 1
+            self.diag2_conflicts[self._get_diag2_index(row, col)] += 1
+    
+    def count_conflicts_fast(self):
+        """Fast conflict counting using tracking arrays"""
         conflicts = 0
-        for i in range(self.n):
-            for j in range(i + 1, self.n):
-                # Check if queens attack each other
-                if (board[i] == board[j] or  # Same row
-                    abs(board[i] - board[j]) == abs(i - j)):  # Same diagonal
-                    conflicts += 1
+        
+        # Row conflicts
+        for count in self.row_conflicts:
+            if count > 1:
+                conflicts += count * (count - 1) // 2
+        
+        # Diagonal conflicts
+        for count in self.diag1_conflicts:
+            if count > 1:
+                conflicts += count * (count - 1) // 2
+                
+        for count in self.diag2_conflicts:
+            if count > 1:
+                conflicts += count * (count - 1) // 2
+        
         return conflicts
     
-    def get_random_neighbor(self, board):
-        """Generate a random neighbor by moving one queen to a different row."""
-        new_board = board[:]
-        col = random.randint(0, self.n - 1)
-        old_row = new_board[col]
+    def get_conflict_delta(self, col, old_row, new_row):
+        """Calculate change in conflicts for a move without actually making it"""
+        delta = 0
         
-        # Choose a different row
-        new_row = random.randint(0, self.n - 1)
-        while new_row == old_row:
+        # Row conflict change
+        delta -= max(0, self.row_conflicts[old_row] - 1)
+        delta -= max(0, self.row_conflicts[new_row])
+        delta += max(0, self.row_conflicts[old_row] - 2)
+        delta += max(0, self.row_conflicts[new_row] - 1)
+        
+        # Diagonal conflict changes
+        old_diag1 = self._get_diag1_index(old_row, col)
+        new_diag1 = self._get_diag1_index(new_row, col)
+        old_diag2 = self._get_diag2_index(old_row, col)
+        new_diag2 = self._get_diag2_index(new_row, col)
+        
+        # / diagonal
+        delta -= max(0, self.diag1_conflicts[old_diag1] - 1)
+        delta -= max(0, self.diag1_conflicts[new_diag1])
+        delta += max(0, self.diag1_conflicts[old_diag1] - 2)
+        delta += max(0, self.diag1_conflicts[new_diag1] - 1)
+        
+        # \ diagonal  
+        delta -= max(0, self.diag2_conflicts[old_diag2] - 1)
+        delta -= max(0, self.diag2_conflicts[new_diag2])
+        delta += max(0, self.diag2_conflicts[old_diag2] - 2)
+        delta += max(0, self.diag2_conflicts[new_diag2] - 1)
+        
+        return delta
+    
+    def get_smart_neighbor(self):
+        """Generate neighbor by focusing on conflicted queens"""
+        # Find columns with conflicts
+        conflicted_cols = []
+        for col in range(self.n):
+            row = self.board[col]
+            if (self.row_conflicts[row] > 1 or 
+                self.diag1_conflicts[self._get_diag1_index(row, col)] > 1 or
+                self.diag2_conflicts[self._get_diag2_index(row, col)] > 1):
+                conflicted_cols.append(col)
+        
+        # Choose column (prefer conflicted ones)
+        if conflicted_cols and random.random() < 0.8:
+            col = random.choice(conflicted_cols)
+        else:
+            col = random.randint(0, self.n - 1)
+        
+        old_row = self.board[col]
+        
+        # Find best new row for this column
+        best_rows = []
+        best_delta = float('inf')
+        
+        for new_row in range(self.n):
+            if new_row == old_row:
+                continue
+                
+            delta = self.get_conflict_delta(col, old_row, new_row)
+            if delta < best_delta:
+                best_delta = delta
+                best_rows = [new_row]
+            elif delta == best_delta:
+                best_rows.append(new_row)
+        
+        # Choose randomly among best moves (or occasionally a random move)
+        if best_rows and random.random() < 0.9:
+            new_row = random.choice(best_rows)
+        else:
             new_row = random.randint(0, self.n - 1)
+            while new_row == old_row:
+                new_row = random.randint(0, self.n - 1)
+            best_delta = self.get_conflict_delta(col, old_row, new_row)
         
-        new_board[col] = new_row
-        return new_board, col, old_row, new_row
+        return col, old_row, new_row, best_delta
     
-    def acceptance_probability(self, current_cost, new_cost, temperature):
-        """Calculate acceptance probability for a move."""
-        if new_cost < current_cost:
+    def acceptance_probability(self, delta_cost, temperature):
+        """Calculate acceptance probability for a move"""
+        if delta_cost <= 0:
             return 1.0
-        if temperature == 0:
+        if temperature <= 0:
             return 0.0
-        return math.exp(-(new_cost - current_cost) / temperature)
+        return math.exp(-delta_cost / temperature)
     
-    def solve(self):
-        """Solve the N-Queens problem using Simulated Annealing."""
-        self.step_by_step_enabled = False
+    def adaptive_cooling_schedule(self, temperature, accepted_ratio, plateau_count):
+        """Adaptive cooling based on acceptance rate and plateau detection"""
+        if not self.adaptive_cooling:
+            return temperature * self.cooling_rate
+        
+        # Slow cooling if accepting too few moves
+        if accepted_ratio < 0.1:
+            return temperature * 0.99
+        # Fast cooling if accepting too many moves
+        elif accepted_ratio > 0.9:
+            return temperature * 0.8
+        # Reheat if stuck in plateau
+        elif plateau_count > 50:
+            return temperature * 1.2
+        else:
+            return temperature * self.cooling_rate
+    
+    def solve(self, track_steps=False):
+        """Solve using optimized simulated annealing"""
+        self.track_steps = track_steps
+        if track_steps:
+            self.steps = []
+            
         start_time = time.time()
         
         # Initialize with random solution
         self.board = [random.randint(0, self.n - 1) for _ in range(self.n)]
-        self.current_conflicts = self.count_conflicts(self.board)
+        self._initialize_conflict_arrays(self.board)
+        self.current_conflicts = self.count_conflicts_fast()
+        
+        # Track best solution
+        self.best_board = self.board[:]
+        self.best_conflicts = self.current_conflicts
         
         # Reset statistics
-        self.total_steps = 0
-        self.temperature_changes = 0
-        self.accepted_moves = 0
-        self.rejected_moves = 0
+        for key in self.stats:
+            self.stats[key] = 0
+        self.stats['best_conflicts'] = self.current_conflicts
         
         temperature = self.initial_temp
+        plateau_count = 0
+        no_improvement_steps = 0
         
-        while temperature > self.min_temp:
-            self.temperature_changes += 1
+        if track_steps:
+            self._record_step(temperature, "Initial random state", None, None)
+        
+        while temperature > self.min_temp and self.current_conflicts > 0:
+            self.stats['temperature_changes'] += 1
+            accepted_this_temp = 0
             
             for iteration in range(self.max_iterations):
-                self.total_steps += 1
+                self.stats['total_steps'] += 1
                 
-                # Check if solution found
                 if self.current_conflicts == 0:
-                    self.solutions_found = 1
-                    self.solve_time = time.time() - start_time
-                    return True
+                    self.stats['solutions_found'] = 1
+                    break
                 
-                # Generate neighbor
-                neighbor_board, col, old_row, new_row = self.get_random_neighbor(self.board)
-                neighbor_conflicts = self.count_conflicts(neighbor_board)
+                # Generate smart neighbor
+                col, old_row, new_row, delta = self.get_smart_neighbor()
                 
                 # Calculate acceptance probability
-                prob = self.acceptance_probability(self.current_conflicts, neighbor_conflicts, temperature)
+                prob = self.acceptance_probability(delta, temperature)
                 
-                # Accept or reject the move
+                # Accept or reject move
                 if random.random() < prob:
-                    self.board = neighbor_board
-                    self.current_conflicts = neighbor_conflicts
-                    self.accepted_moves += 1
-                else:
-                    self.rejected_moves += 1
-            
-            # Cool down
-            temperature *= self.cooling_rate
-        
-        self.solve_time = time.time() - start_time
-        return False
-    
-    def solve_step_by_step(self):
-        """Solve with step-by-step tracking for visualization."""
-        self.step_by_step_enabled = True
-        self.steps = []
-        start_time = time.time()
-        
-        # Initialize with random solution
-        self.board = [random.randint(0, self.n - 1) for _ in range(self.n)]
-        self.current_conflicts = self.count_conflicts(self.board)
-        
-        # Reset statistics
-        self.total_steps = 0
-        self.temperature_changes = 0
-        self.accepted_moves = 0
-        self.rejected_moves = 0
-        
-        # Record initial state
-        self.steps.append({
-            'board_state': self.board[:],
-            'conflicts': self.current_conflicts,
-            'temperature': self.initial_temp,
-            'message': f'Initial random state with {self.current_conflicts} conflicts',
-            'move_accepted': None,
-            'acceptance_prob': None
-        })
-        
-        temperature = self.initial_temp
-        
-        while temperature > self.min_temp:
-            self.temperature_changes += 1
-            
-            for iteration in range(self.max_iterations):
-                self.total_steps += 1
-                
-                # Check if solution found
-                if self.current_conflicts == 0:
-                    self.solutions_found = 1
-                    self.solve_time = time.time() - start_time
-                    self.steps.append({
-                        'board_state': self.board[:],
-                        'conflicts': self.current_conflicts,
-                        'temperature': temperature,
-                        'message': f'Solution found! 0 conflicts achieved.',
-                        'move_accepted': True,
-                        'acceptance_prob': 1.0
-                    })
-                    return True
-                
-                # Generate neighbor
-                neighbor_board, col, old_row, new_row = self.get_random_neighbor(self.board)
-                neighbor_conflicts = self.count_conflicts(neighbor_board)
-                
-                # Calculate acceptance probability
-                prob = self.acceptance_probability(self.current_conflicts, neighbor_conflicts, temperature)
-                
-                # Accept or reject the move
-                move_accepted = random.random() < prob
-                
-                if move_accepted:
-                    self.board = neighbor_board
-                    self.current_conflicts = neighbor_conflicts
-                    self.accepted_moves += 1
+                    # Make the move
+                    self.board[col] = new_row
+                    self._update_conflicts_fast(col, old_row, new_row, -1)
+                    self.current_conflicts += delta
                     
-                    action_msg = "better" if neighbor_conflicts < self.current_conflicts else "worse (accepted by probability)"
-                    message = f'Moved queen in col {col} from row {old_row} to {new_row} - {action_msg} solution'
+                    self.stats['accepted_moves'] += 1
+                    accepted_this_temp += 1
+                    
+                    # Update best solution
+                    if self.current_conflicts < self.best_conflicts:
+                        self.best_board = self.board[:]
+                        self.best_conflicts = self.current_conflicts
+                        no_improvement_steps = 0
+                        plateau_count = 0
+                    else:
+                        no_improvement_steps += 1
+                    
+                    if track_steps:
+                        msg = f"Moved Q{col} {old_row}→{new_row} (Δ={delta})"
+                        self._record_step(temperature, msg, True, prob)
                 else:
-                    self.rejected_moves += 1
-                    message = f'Rejected move: col {col} row {old_row}→{new_row} (prob={prob:.3f})'
+                    self.stats['rejected_moves'] += 1
+                    no_improvement_steps += 1
+                    
+                    if track_steps:
+                        msg = f"Rejected Q{col} {old_row}→{new_row} (p={prob:.3f})"
+                        self._record_step(temperature, msg, False, prob)
                 
-                # Record step
-                self.steps.append({
-                    'board_state': self.board[:],
-                    'conflicts': self.current_conflicts,
-                    'temperature': temperature,
-                    'message': message,
-                    'move_accepted': move_accepted,
-                    'acceptance_prob': prob,
-                    'row': new_row if move_accepted else None,
-                    'col': col if move_accepted else None,
-                    'old_row': old_row,
-                    'new_row': new_row
-                })
-                
-                # Limit steps for visualization (prevent memory issues)
-                if len(self.steps) > 5000:
+                # Early termination if no improvement for too long
+                if no_improvement_steps > self.n * 100:
                     break
             
-            # Cool down
-            old_temp = temperature
-            temperature *= self.cooling_rate
+            # Update plateau counter
+            if accepted_this_temp == 0:
+                plateau_count += 1
+            else:
+                plateau_count = 0
             
-            # Record temperature change
-            if len(self.steps) <= 5000:
-                self.steps.append({
-                    'board_state': self.board[:],
-                    'conflicts': self.current_conflicts,
-                    'temperature': temperature,
-                    'message': f'Temperature cooled: {old_temp:.3f} → {temperature:.3f}',
-                    'move_accepted': None,
-                    'acceptance_prob': None
-                })
+            # Adaptive cooling
+            acceptance_rate = accepted_this_temp / self.max_iterations
+            old_temp = temperature
+            temperature = self.adaptive_cooling_schedule(temperature, acceptance_rate, plateau_count)
+            
+            if track_steps and len(self.steps) < self.max_steps_tracked:
+                self._record_step(temperature, f"Temp: {old_temp:.3f}→{temperature:.3f}", None, None)
         
-        self.solve_time = time.time() - start_time
+        # Restore best solution found
+        if self.best_conflicts < self.current_conflicts:
+            self.board = self.best_board[:]
+            self.current_conflicts = self.best_conflicts
         
-        # Add final step
-        if len(self.steps) <= 5000:
-            self.steps.append({
-                'board_state': self.board[:],
-                'conflicts': self.current_conflicts,
-                'temperature': temperature,
-                'message': f'Annealing completed. Final conflicts: {self.current_conflicts}',
-                'move_accepted': None,
-                'acceptance_prob': None
-            })
+        self.stats['solve_time'] = time.time() - start_time
+        self.stats['final_conflicts'] = self.current_conflicts
         
         return self.current_conflicts == 0
     
-    def get_step(self, step_index):
-        """Get a specific step for visualization."""
-        if 0 <= step_index < len(self.steps):
-            return self.steps[step_index]
-        return None
-    
-    def convert_board_to_positions(self, board):
-        """Convert board representation to list of (row, col) positions."""
-        return [(board[col], col) for col in range(len(board))]
+    def _record_step(self, temperature, message, accepted, prob):
+        """Record step for visualization (memory efficient)"""
+        if len(self.steps) >= self.max_steps_tracked:
+            return
+            
+        self.steps.append({
+            'step': len(self.steps),
+            'board': self.board[:],
+            'conflicts': self.current_conflicts,
+            'temperature': temperature,
+            'message': message,
+            'accepted': accepted,
+            'probability': prob
+        })
     
     def get_statistics(self):
-        """Get solver statistics."""
+        """Get comprehensive solver statistics"""
+        total_moves = self.stats['accepted_moves'] + self.stats['rejected_moves']
         return {
-            'solve_time': self.solve_time,
-            'total_steps': self.total_steps,
-            'solutions_found': self.solutions_found,
-            'temperature_changes': self.temperature_changes,
-            'accepted_moves': self.accepted_moves,
-            'rejected_moves': self.rejected_moves,
-            'acceptance_rate': self.accepted_moves / max(1, self.accepted_moves + self.rejected_moves),
-            'final_conflicts': self.current_conflicts if hasattr(self, 'current_conflicts') else 0
+            **self.stats,
+            'acceptance_rate': self.stats['accepted_moves'] / max(1, total_moves),
+            'avg_steps_per_temp': self.stats['total_steps'] / max(1, self.stats['temperature_changes']),
+            'success_rate': 1.0 if self.stats['solutions_found'] > 0 else 0.0
         }
     
-    def print_solution(self):
-        """Print the current solution."""
+    def print_solution(self, show_conflicts=False):
+        """Print the solution with optional conflict visualization"""
         if not self.board:
             print("No solution available.")
             return
-            
-        print(f"\nSolution found with {self.current_conflicts} conflicts:")
-        print("Board representation (column index -> row position):")
-        for col, row in enumerate(self.board):
-            print(f"Column {col}: Row {row}")
         
-        print("\nVisual representation:")
+        print(f"\nSolution (conflicts: {self.current_conflicts}):")
+        print("Visual representation:")
+        
         for row in range(self.n):
             line = ""
             for col in range(self.n):
                 if self.board[col] == row:
-                    line += "Q "
+                    if show_conflicts and self.current_conflicts > 0:
+                        # Mark conflicted queens
+                        queen_row = self.board[col]
+                        has_conflict = (self.row_conflicts[queen_row] > 1 or
+                                      self.diag1_conflicts[self._get_diag1_index(queen_row, col)] > 1 or
+                                      self.diag2_conflicts[self._get_diag2_index(queen_row, col)] > 1)
+                        line += "X " if has_conflict else "Q "
+                    else:
+                        line += "Q "
                 else:
                     line += ". "
             print(line)
+        
+        if show_conflicts and self.current_conflicts > 0:
+            print("(X = conflicted queen, Q = safe queen)")
 
-# Example usage and testing
-if __name__ == "__main__":
-    def test_solver(n, show_solution=True):
-        print(f"\n=== Testing Simulated Annealing N-Queens Solver (n={n}) ===")
-        
-        solver = NQueensSimulatedAnnealing(n, initial_temp=100.0, cooling_rate=0.95)
-        
-        print("Attempting to solve...")
-        success = solver.solve()
-        
-        stats = solver.get_statistics()
-        print(f"\nResults:")
-        print(f"Success: {success}")
-        print(f"Time: {stats['solve_time']:.4f} seconds")
-        print(f"Total steps: {stats['total_steps']:,}")
-        print(f"Temperature changes: {stats['temperature_changes']}")
-        print(f"Accepted moves: {stats['accepted_moves']:,}")
-        print(f"Rejected moves: {stats['rejected_moves']:,}")
-        print(f"Acceptance rate: {stats['acceptance_rate']:.2%}")
-        print(f"Final conflicts: {stats['final_conflicts']}")
-        
-        if success and show_solution:
-            solver.print_solution()
-        
-        return success
+def benchmark_solver(sizes=[4, 8, 12, 16], trials=5):
+    """Benchmark the optimized solver"""
+    print("=== Optimized N-Queens Simulated Annealing Benchmark ===\n")
     
-    # Test different board sizes
-    test_sizes = [4, 8, 12]
-    for size in test_sizes:
-        success = test_solver(size, show_solution=(size <= 8))
-        if not success:
-            print(f"Failed to find solution for n={size}. Try running again or adjusting parameters.")
-        print("-" * 60)
+    for n in sizes:
+        print(f"Testing n={n} ({trials} trials):")
+        successes = 0
+        total_time = 0
+        total_steps = 0
+        
+        for trial in range(trials):
+            solver = OptimizedNQueensSimulatedAnnealing(n)
+            success = solver.solve()
+            stats = solver.get_statistics()
+            
+            if success:
+                successes += 1
+            total_time += stats['solve_time']
+            total_steps += stats['total_steps']
+            
+            print(f"  Trial {trial+1}: {'✓' if success else '✗'} "
+                  f"({stats['solve_time']:.3f}s, {stats['total_steps']:,} steps)")
+        
+        success_rate = successes / trials
+        avg_time = total_time / trials
+        avg_steps = total_steps / trials
+        
+        print(f"  Summary: {success_rate:.1%} success, {avg_time:.3f}s avg, {avg_steps:,.0f} steps avg\n")
+        
+        # Show one solution if successful
+        if successes > 0:
+            solver = OptimizedNQueensSimulatedAnnealing(n)
+            if solver.solve() and n <= 12:
+                solver.print_solution()
+                print()
+
+if __name__ == "__main__":
+    # Quick test
+    print("=== Quick Test ===")
+    solver = OptimizedNQueensSimulatedAnnealing(8)
+    success = solver.solve()
+    stats = solver.get_statistics()
+    
+    print(f"8-Queens: {'✓ Solved' if success else '✗ Failed'}")
+    print(f"Time: {stats['solve_time']:.3f}s")
+    print(f"Steps: {stats['total_steps']:,}")
+    print(f"Acceptance rate: {stats['acceptance_rate']:.1%}")
+    
+    if success:
+        solver.print_solution()
+    
+    print("\n" + "="*60)
+    
+    # Full benchmark
+    benchmark_solver([4, 8, 12, 16], trials=3)

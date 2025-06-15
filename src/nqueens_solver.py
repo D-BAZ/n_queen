@@ -147,7 +147,14 @@ class OptimizedNQueensSolver:
         """
         Iterative solution for better performance on large boards.
         Uses explicit stack instead of recursion to avoid stack overflow.
+        FIXED: Proper bounds checking to prevent index out of range errors.
         """
+        # Reset board and constraint sets
+        self.board = [-1] * self.n
+        self.occupied_cols.clear()
+        self.occupied_diag1.clear()
+        self.occupied_diag2.clear()
+        
         stack = [0]  # Start with row 0
         cols = [0] * self.n  # Track current column for each row
         
@@ -165,7 +172,9 @@ class OptimizedNQueensSolver:
                 # Backtrack to continue searching
                 stack.pop()
                 if stack:
-                    self.remove_queen(stack[-1])
+                    # Remove queen from the previous row
+                    prev_row = stack[-1]
+                    self.remove_queen(prev_row)
                 continue
             
             found_valid_col = False
@@ -173,12 +182,16 @@ class OptimizedNQueensSolver:
             # Try columns starting from current position
             for col in range(cols[row], self.n):
                 self.total_steps += 1
-                cols[row] = col + 1  # Next time, start from next column
                 
                 if self.is_safe_optimized(row, col):
                     self.place_queen(row, col)
+                    cols[row] = col + 1  # Next time, start from next column
                     stack.append(row + 1)
-                    cols[row + 1] = 0  # Reset column counter for next row
+                    
+                    # Initialize column counter for next row (with bounds check)
+                    if row + 1 < self.n:
+                        cols[row + 1] = 0
+                    
                     found_valid_col = True
                     break
             
@@ -189,7 +202,10 @@ class OptimizedNQueensSolver:
                 self.backtrack_count += 1
                 
                 if stack:
-                    self.remove_queen(stack[-1])
+                    # Remove queen from current row before backtracking
+                    current_row = stack[-1]
+                    if current_row < self.n:
+                        self.remove_queen(current_row)
         
         return len(self.solutions) > 0
     

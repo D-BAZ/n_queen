@@ -1,0 +1,180 @@
+N-QUEENS SOLVER PERFORMANCE TEST RESULTS
+==================================================
+
+Test Configuration:
+Board Sizes: [10, 30, 50, 100, 200]
+Solvers Tested: ['exhaustive', 'hill_climbing', 'simulated_annealing', 'genetic']
+Test Date: 2025-06-15 18:24:04
+
+EXHAUSTIVE SOLVER RESULTS:
+------------------------------
+N = 10:
+  Success: True
+  Execution Time: 0.0011s
+  Memory Used: 0.01MB
+  Peak Memory: 0.01MB
+  Solver Statistics: {'total_steps': 975, 'backtrack_count': 92, 'solutions_found': 1, 'solve_time': 0.0010454654693603516, 'steps_recorded': 0, 'steps_per_second': 932598.9509692133}
+  Attempts Made: 1
+
+N = 30:
+  Success: True
+  Execution Time: 1949.4335s
+  Memory Used: 0.00MB
+  Peak Memory: 0.01MB
+  Solver Statistics: {'total_steps': 1692888135, 'backtrack_count': 56429589, 'solutions_found': 1, 'solve_time': 1949.4334585666656, 'steps_recorded': 0, 'steps_per_second': 868400.0613412615}
+  Attempts Made: 1
+
+N = 50:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+N = 100:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+N = 200:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+
+HILL_CLIMBING SOLVER RESULTS:
+------------------------------
+N = 10:
+  Success: True
+  Execution Time: 0.0022s
+  Memory Used: 0.00MB
+  Peak Memory: 0.01MB
+  Solver Statistics: {'total_steps': 4, 'restart_count': 1, 'sideways_moves': 0, 'solutions_found': 1, 'solve_time': 0.002054452896118164, 'steps_recorded': 6, 'min_conflicts': 0, 'avg_conflicts': 1.0, 'max_restarts': 100, 'steps_per_second': 1946.9903678774515}
+  Attempts Made: 1
+
+N = 30:
+  Success: True
+  Execution Time: 0.0294s
+  Memory Used: 0.00MB
+  Peak Memory: 0.01MB
+  Solver Statistics: {'total_steps': 2, 'restart_count': 0, 'sideways_moves': 0, 'solutions_found': 1, 'solve_time': 0.029273271560668945, 'steps_recorded': 3, 'min_conflicts': 0, 'avg_conflicts': 0.5, 'max_restarts': 300, 'steps_per_second': 68.32171101391909}
+  Attempts Made: 1
+
+N = 50:
+  Success: True
+  Execution Time: 0.2666s
+  Memory Used: 0.00MB
+  Peak Memory: 0.51MB
+  Solver Statistics: {'total_steps': 9, 'restart_count': 2, 'sideways_moves': 0, 'solutions_found': 1, 'solve_time': 0.26650190353393555, 'steps_recorded': 12, 'min_conflicts': 0, 'avg_conflicts': 1.8888888888888888, 'max_restarts': 500, 'steps_per_second': 33.77086572612029}
+  Attempts Made: 1
+
+N = 100:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+N = 200:
+  Success: True
+  Execution Time: 519.3134s
+  Memory Used: 0.21MB
+  Peak Memory: 1.04MB
+  Solver Statistics: {'total_steps': 169, 'restart_count': 73, 'sideways_moves': 0, 'solutions_found': 1, 'solve_time': 519.3133289813995, 'steps_recorded': 243, 'min_conflicts': 0, 'avg_conflicts': 3.3491124260355027, 'max_restarts': 1000, 'steps_per_second': 0.32542973686325916}
+  Attempts Made: 1
+
+
+SIMULATED_ANNEALING SOLVER RESULTS:
+------------------------------
+N = 10:
+  Success: True
+  Execution Time: 0.0004s
+  Memory Used: 0.01MB
+  Peak Memory: 0.00MB
+  Solver Statistics: {'total_steps': 4, 'solve_time': 0.0003037452697753906, 'temperature_changes': 1, 'accepted_moves': 3, 'rejected_moves': 0, 'solutions_found': 1, 'best_conflicts': 13, 'plateau_count': 0, 'final_conflicts': 0, 'acceptance_rate': 1.0, 'avg_steps_per_temp': 4.0, 'success_rate': 1.0}
+  Attempts Made: 1
+
+N = 30:
+  Success: True
+  Execution Time: 0.0667s
+  Memory Used: 0.00MB
+  Peak Memory: 0.01MB
+  Solver Statistics: {'total_steps': 7, 'solve_time': 0.001268625259399414, 'temperature_changes': 1, 'accepted_moves': 6, 'rejected_moves': 0, 'solutions_found': 1, 'best_conflicts': 30, 'plateau_count': 0, 'final_conflicts': 0, 'acceptance_rate': 1.0, 'avg_steps_per_temp': 7.0, 'success_rate': 1.0}
+  Attempts Made: 2
+
+N = 50:
+  Success: True
+  Execution Time: 0.0019s
+  Memory Used: 0.00MB
+  Peak Memory: 0.01MB
+  Solver Statistics: {'total_steps': 12, 'solve_time': 0.0018138885498046875, 'temperature_changes': 1, 'accepted_moves': 11, 'rejected_moves': 0, 'solutions_found': 1, 'best_conflicts': 52, 'plateau_count': 0, 'final_conflicts': 0, 'acceptance_rate': 1.0, 'avg_steps_per_temp': 12.0, 'success_rate': 1.0}
+  Attempts Made: 1
+
+N = 100:
+  Success: True
+  Execution Time: 0.0060s
+  Memory Used: 0.00MB
+  Peak Memory: 0.21MB
+  Solver Statistics: {'total_steps': 26, 'solve_time': 0.005924224853515625, 'temperature_changes': 1, 'accepted_moves': 25, 'rejected_moves': 0, 'solutions_found': 1, 'best_conflicts': 113, 'plateau_count': 0, 'final_conflicts': 0, 'acceptance_rate': 1.0, 'avg_steps_per_temp': 26.0, 'success_rate': 1.0}
+  Attempts Made: 1
+
+N = 200:
+  Success: True
+  Execution Time: 3.0945s
+  Memory Used: 0.01MB
+  Peak Memory: 0.02MB
+  Solver Statistics: {'total_steps': 49, 'solve_time': 0.06290292739868164, 'temperature_changes': 1, 'accepted_moves': 48, 'rejected_moves': 0, 'solutions_found': 1, 'best_conflicts': 237, 'plateau_count': 0, 'final_conflicts': 0, 'acceptance_rate': 1.0, 'avg_steps_per_temp': 49.0, 'success_rate': 1.0}
+  Attempts Made: 2
+
+
+GENETIC SOLVER RESULTS:
+------------------------------
+N = 10:
+  Success: True
+  Execution Time: 0.1598s
+  Memory Used: 0.16MB
+  Peak Memory: 0.06MB
+  Solver Statistics: {'solve_time': 0.15973782539367676, 'total_steps': 91, 'generations': 90, 'population_size': 50, 'mutation_rate': 0.1, 'elite_size': 5, 'solutions_found': 1, 'best_fitness': 45, 'final_avg_fitness': 42.5, 'convergence_generation': 90}
+  Attempts Made: 1
+
+N = 30:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+N = 50:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+N = 100:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+N = 200:
+  Success: False
+  Execution Time: 0.0000s
+  Memory Used: 0.00MB
+  Peak Memory: 0.00MB
+  Error: Interrupted by user
+  Attempts Made: 0
+
+

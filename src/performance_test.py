@@ -23,22 +23,22 @@ class PerformanceTester:
     def _import_solvers(self):
         """Import all available solver implementations"""
         try:
-            from nqueens_solver import NQueensSolver
-            self.solvers['exhaustive'] = NQueensSolver
+            from nqueens_solver import OptimizedNQueensSolver
+            self.solvers['exhaustive'] = OptimizedNQueensSolver
             print("✓ Exhaustive search solver imported")
         except ImportError:
             print("✗ Could not import exhaustive search solver (nqueens_solver.py)")
         
         try:
-            from nqueens_hill_climbing import NQueensHillClimbing
-            self.solvers['hill_climbing'] = NQueensHillClimbing
+            from nqueens_hill_climbing import OptimizedNQueensHillClimbing
+            self.solvers['hill_climbing'] = OptimizedNQueensHillClimbing
             print("✓ Hill climbing solver imported")
         except ImportError:
             print("✗ Could not import hill climbing solver (nqueens_hill_climbing.py)")
         
         try:
-            from nqueens_simulated_annealing import NQueensSimulatedAnnealing
-            self.solvers['simulated_annealing'] = NQueensSimulatedAnnealing
+            from nqueens_simulated_annealing import OptimizedNQueensSimulatedAnnealing
+            self.solvers['simulated_annealing'] = OptimizedNQueensSimulatedAnnealing
             print("✓ Simulated annealing solver imported")
         except ImportError:
             print("✗ Could not import simulated annealing solver (nqueens_simulated_annealing.py)")
@@ -101,7 +101,7 @@ class PerformanceTester:
             
             # Show warning if taking too long, but continue running
             if elapsed_time > warning_time and not warning_shown:
-                print(f"    ⚠️  Warning: Taking longer than {warning_time}s (currently {elapsed_time:.1f}s)")
+                print(f"    Warning: Taking longer than {warning_time}s (currently {elapsed_time:.1f}s)")
                 print(f"    Still running... Press Ctrl+C to interrupt if needed")
                 warning_shown = True
             
@@ -118,15 +118,16 @@ class PerformanceTester:
                         
                 elif solver_name == 'hill_climbing':
                     solver = self.solvers[solver_name](n, max_restarts=min(1000, n * 10))
-                    success = solver.solve_step_by_step()
+                    # Use optimized solve_step_by_step with smart restart and sideways moves
+                    success = solver.solve_step_by_step(use_smart_restart=True, allow_sideways=True)
                     solver_stats = solver.get_statistics()
                     
                 elif solver_name == 'simulated_annealing':
                     # Adjust parameters based on board size
                     initial_temp = max(100.0, n * 2)
                     cooling_rate = 0.95
-                    solver = self.solvers[solver_name](n, initial_temp=initial_temp, 
-                                                     cooling_rate=cooling_rate)
+                    solver = self.solvers[solver_name](n, initial_temp=initial_temp, cooling_rate=cooling_rate, adaptive_cooling=True)
+                    # Use optimized solve method
                     success = solver.solve()
                     solver_stats = solver.get_statistics()
                     
@@ -406,7 +407,7 @@ def main():
     """Main function to run the performance testing suite"""
     print("N-Queens Solver Performance Testing Suite - UNLIMITED RETRIES")
     print("This will test all available solvers with board sizes: 10, 30, 50, 100, 200")
-    print("⚠️  WARNING: Will keep trying until solution found or you press Ctrl+C!")
+    print("  WARNING: Will keep trying until solution found or you press Ctrl+C!")
     print("   - Exhaustive search may take extremely long for large boards")
     print("   - Stochastic algorithms will retry until they find a solution")
     print("   - Press Ctrl+C at any time to interrupt a test")
