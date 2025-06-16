@@ -406,6 +406,10 @@ class OptimizedNQueensHillClimbing:
         if 0 <= step_index < len(self.steps):
             return self.steps[step_index]
         return None
+    
+    def convert_board_to_positions(self, board_state: List[int]) -> List[Tuple[int, int]]:
+        """Convert board state (list of row indices) to list of (row, col) positions."""
+        return [(i, col) for i, col in enumerate(board_state)]
 
 def solve_nqueens_hill_climbing_optimized(n: int, method: str = 'hill_climbing', 
                                         max_restarts: int = 100, 

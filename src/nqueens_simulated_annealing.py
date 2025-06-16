@@ -62,6 +62,7 @@ class OptimizedNQueensSimulatedAnnealing:
         """Get index for \ diagonal (row + col)"""
         return row + col
     
+
     def _update_conflicts_fast(self, col, old_row, new_row, delta):
         """Fast conflict update using tracking arrays"""
         # Update row conflicts
