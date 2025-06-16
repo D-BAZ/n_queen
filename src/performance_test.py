@@ -23,7 +23,7 @@ class PerformanceTester:
     def _import_solvers(self):
         """Import all available solver implementations"""
         try:
-            from nqueens_solver import OptimizedNQueensSolver
+            from nqueens_solver_dfs import OptimizedNQueensSolver
             self.solvers['exhaustive'] = OptimizedNQueensSolver
             print("✓ Exhaustive search solver imported")
         except ImportError:

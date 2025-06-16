@@ -300,6 +300,8 @@ class OptimizedNQueensHillClimbing:
         
         return False
     
+
+    
     def record_step(self, step_type: str, board_state: List[int], conflicts: int, message: str) -> None:
         """Record a step with essential information."""
         self.steps.append({

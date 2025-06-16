@@ -295,24 +295,37 @@ def draw_ui(screen, font, board, solver_active=False, step_info=None, stats=None
         
         # Add solver-specific stats
         if solver_type == 'exhaustive':
-            stats_info.insert(2, f"Backtracks: {stats['backtrack_count']:,}")
+            if 'backtrack_count' in stats:
+                stats_info.insert(2, f"Backtracks: {stats['backtrack_count']:,}")
         elif solver_type == 'hill_climbing':
-            stats_info.insert(2, f"Restarts: {stats['restart_count']:,}")
+            if 'restart_count' in stats:
+                stats_info.insert(2, f"Restarts: {stats['restart_count']:,}")
             if 'min_conflicts' in stats:
                 stats_info.append(f"Min Conflicts: {stats['min_conflicts']}")
+            if 'sideways_moves' in stats:
+                stats_info.append(f"Sideways Moves: {stats['sideways_moves']:,}")
         elif solver_type == 'simulated_annealing':
-            stats_info.insert(2, f"Temp Changes: {stats['temperature_changes']:,}")
-            stats_info.append(f"Accepted: {stats['accepted_moves']:,}")
-            stats_info.append(f"Rejected: {stats['rejected_moves']:,}")
-            stats_info.append(f"Acceptance Rate: {stats['acceptance_rate']:.1%}")
+            if 'temperature_changes' in stats:
+                stats_info.insert(2, f"Temp Changes: {stats['temperature_changes']:,}")
+            if 'accepted_moves' in stats:
+                stats_info.append(f"Accepted: {stats['accepted_moves']:,}")
+            if 'rejected_moves' in stats:
+                stats_info.append(f"Rejected: {stats['rejected_moves']:,}")
+            if 'acceptance_rate' in stats:
+                stats_info.append(f"Acceptance Rate: {stats['acceptance_rate']:.1%}")
             if 'final_conflicts' in stats:
                 stats_info.append(f"Final Conflicts: {stats['final_conflicts']}")
         elif solver_type == 'genetic':
-            stats_info.insert(2, f"Generations: {stats['generations']:,}")
-            stats_info.append(f"Population: {stats['population_size']}")
-            stats_info.append(f"Mutation Rate: {stats['mutation_rate']:.1%}")
-            stats_info.append(f"Elite Size: {stats['elite_size']}")
-            stats_info.append(f"Best Fitness: {stats['best_fitness']}")
+            if 'generations' in stats:
+                stats_info.insert(2, f"Generations: {stats['generations']:,}")
+            if 'population_size' in stats:
+                stats_info.append(f"Population: {stats['population_size']}")
+            if 'mutation_rate' in stats:
+                stats_info.append(f"Mutation Rate: {stats['mutation_rate']:.1%}")
+            if 'elite_size' in stats:
+                stats_info.append(f"Elite Size: {stats['elite_size']}")
+            if 'best_fitness' in stats:
+                stats_info.append(f"Best Fitness: {stats['best_fitness']}")
             if 'convergence_generation' in stats and stats['convergence_generation']:
                 stats_info.append(f"Converged at Gen: {stats['convergence_generation']}")
         
@@ -364,7 +377,7 @@ def main():
     # Try to import the solvers
     try:
         # Assuming the solver files are saved as 'nqueens_solver.py' and 'nqueens_hill_climbing.py'
-        from nqueens_solver import NQueensSolver
+        from nqueens_solver_dfs import OptimizedNQueensSolver as NQueensSolver
         print("N-Queens exhaustive solver imported successfully!")
         exhaustive_available = True
     except ImportError:
@@ -373,7 +386,7 @@ def main():
         NQueensSolver = None
     
     try:
-        from nqueens_hill_climbing import NQueensHillClimbing
+        from nqueens_hill_climbing import OptimizedNQueensHillClimbing as NQueensHillClimbing
         print("N-Queens hill climbing solver imported successfully!")
         hill_climbing_available = True
     except ImportError:
@@ -382,13 +395,13 @@ def main():
         NQueensHillClimbing = None
     
     try:
-        from nqueens_simulated_annealing import NQueensSimulatedAnnealing
-        print("N-Queens simulated annealing solver imported successfully!")
-        simulated_annealing_available = True
+        # Simulated annealing is now part of hill climbing
+        simulated_annealing_available = hill_climbing_available
+        if not simulated_annealing_available:
+            print("Warning: Simulated annealing requires hill climbing solver")
     except ImportError:
         print("Warning: Could not import nqueens_simulated_annealing.py")
         simulated_annealing_available = False
-        NQueensSimulatedAnnealing = None
     
     try:
         from nqueens_genetic import NQueensGenetic
@@ -494,7 +507,7 @@ def main():
                     solver = NQueensSolver(n)
                     current_solver_type = 'exhaustive'
                     
-                    success = solver.solve_step_by_step()
+                    success = solver.solve_step_by_step(find_all=False)  # Only find first solution for visualization
                     solver_result = {
                         'success': success,
                         'statistics': solver.get_statistics(),
@@ -513,10 +526,10 @@ def main():
                 elif event.key == pygame.K_h and hill_climbing_available:  # Solve using hill climbing
                     print("Starting hill climbing solver...")
                     board.clear_board()
-                    solver = NQueensHillClimbing(n, max_restarts=100)
+                    solver = NQueensHillClimbing(n, max_restarts=100, max_sideways=100)
                     current_solver_type = 'hill_climbing'
                     
-                    success = solver.solve_step_by_step()
+                    success = solver.solve_step_by_step(use_smart_restart=True, allow_sideways=True)
                     solver_result = {
                         'success': success,
                         'statistics': solver.get_statistics(),
@@ -535,10 +548,14 @@ def main():
                 elif event.key == pygame.K_s and simulated_annealing_available:  # Solve using simulated annealing
                     print("Starting simulated annealing solver...")
                     board.clear_board()
-                    solver = NQueensSimulatedAnnealing(n, initial_temp=100.0, cooling_rate=0.95)
+                    # Use hill climbing solver with simulated annealing
+                    solver = NQueensHillClimbing(n, max_restarts=3)  # Only one run needed for SA
                     current_solver_type = 'simulated_annealing'
                     
-                    success = solver.solve_step_by_step()
+                    success = solver.solve_with_simulated_annealing(
+                        initial_temp=100.0,
+                        cooling_rate=0.95
+                    )
                     solver_result = {
                         'success': success,
                         'statistics': solver.get_statistics(),

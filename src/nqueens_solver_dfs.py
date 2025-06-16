@@ -32,6 +32,7 @@ class OptimizedNQueensSolver:
                 (row - col) not in self.occupied_diag1 and
                 (row + col) not in self.occupied_diag2)
     
+
     def place_queen(self, row: int, col: int) -> None:
         """Place a queen and update constraint sets."""
         self.board[row] = col
@@ -58,12 +59,9 @@ class OptimizedNQueensSolver:
             'type': step_type,
             'row': row,
             'col': col,
-            'message': message
+            'message': message,
+            'board_state': self.board.copy()  # Always store board state for visualization
         }
-        
-        # Only store board state for key steps to save memory
-        if step_type in ['solution_found', 'place_queen']:
-            step['board_state'] = self.board.copy()
             
         self.steps.append(step)
     
@@ -297,6 +295,10 @@ class OptimizedNQueensSolver:
         if 0 <= step_index < len(self.steps):
             return self.steps[step_index]
         return None
+    
+    def convert_board_to_positions(self, board_state: List[int]) -> List[Tuple[int, int]]:
+        """Convert board state (list of row indices) to list of (row, col) positions."""
+        return [(i, col) for i, col in enumerate(board_state) if col != -1]
 
 def solve_nqueens_optimized(n: int, method: str = 'optimized', find_all: bool = False) -> dict:
     """
